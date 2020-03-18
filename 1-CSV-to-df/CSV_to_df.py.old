@@ -1,0 +1,39 @@
+import sys
+import pandas as pd 
+import pickle
+
+if __name__ == '__main__':
+    print ("This is the name of the script: ", sys.argv[0])
+    print ("Number of arguments: ", len(sys.argv))
+    print ("The arguments are: " , str(sys.argv))
+
+    default_filename = './tmp/tmp_df.pickle'
+    
+    ref_args = ['path_to_data','path_to_save']
+    ref_type = {'path_to_data':'text','path_to_save':'text'}
+
+    dict_args = {arg_name: {'value': None, 'type': ref_type['path_to_data']} 
+    
+        for arg_name in ref_args}
+    print(dict_args)
+    for ii in range(len(sys.argv)):
+        tmp_arg = sys.argv[ii]
+        if not tmp_arg in ref_args:
+            continue
+
+        dict_args[tmp_arg]['value'] = sys.argv[ii+1]
+
+    csv_path = dict_args['path_to_data']['value']
+    if not csv_path is None:
+        boston = pd.read_csv(csv_path, header = 0)
+        print("\n**Header**")
+        print(boston.head())
+
+        print("\n**Any Missing Dataset**")
+        print(boston.isnull().sum())
+        
+        path_to_save = dict_args['path_to_save']['value'] \
+            if not dict_args['path_to_save']['value'] is None else default_filename
+        
+        with open(path_to_save, 'wb') as file:
+          pickle.dump(boston, file)

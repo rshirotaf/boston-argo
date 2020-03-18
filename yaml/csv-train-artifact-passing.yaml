@@ -1,0 +1,173 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: csv-df-s3-
+spec:
+  entrypoint: csv-df-s3-DAG
+  templates:
+  - name: csv-df-s3-DAG
+    dag:
+      tasks:
+      - name: csv-df
+        template: csv-df-s3-boston
+        arguments:
+          parameters: [{name: csv_path, value: /S3data/BostonHousing.csv}, 
+                      {name: output_path, value: /S3data/df.pickle}]
+      - name: split-set
+        dependencies: [csv-df]
+        template: split-set-s3-boston
+        arguments:
+          artifacts:
+          - name: data-df
+            from: "{{tasks.csv-df.outputs.artifacts.data-df}}"
+          parameters: [{name: df_path, value: /S3data/df.pickle},
+                      {name: list_feat1, value: lstat},
+                      {name: list_feat2, value: rm},
+                      {name: target, value: medv},
+                      {name: output_path, value: /S3data/split_set.pickle}]
+      - name: train-model
+        dependencies: [split-set]
+        template: train-model-s3-boston
+        arguments:
+          artifacts:
+          - name: data-split
+            from: "{{tasks.split-set.outputs.artifacts.data-split}}"
+          parameters: [{name: split_path, value: /S3data/split_set.pickle},
+                      {name: output_path, value: /S3data/trained_model.pickle}]
+
+      - name: eval-model
+        dependencies: [split-set, train-model]
+        template: eval-model-s3-boston
+        arguments:
+          artifacts:
+          - name: data-split
+            from: "{{tasks.split-set.outputs.artifacts.data-split}}"
+          - name: data-train-model
+            from: "{{tasks.train-model.outputs.artifacts.data-trained-model}}"
+          parameters: [{name: split_path, value: /S3data/split_set.pickle},
+                      {name: trained_model_path, value: /S3data/trained_model.pickle}]
+  - name: eval-model-s3-boston
+    inputs:
+      parameters:
+        - name: split_path
+        - name: trained_model_path
+      artifacts:
+      - name: data-split
+        path: /S3data/split_set.pickle
+      - name: data-train-model
+        path: /S3data/trained_model.pickle
+    container:
+      image: eval-model:latest
+      imagePullPolicy: Never
+      command: [python3]
+      args: ['eval_model.py',
+            '--split_path', '{{inputs.parameters.split_path}}',
+            '--trained_model_path', '{{inputs.parameters.trained_model_path}}']
+  - name: train-model-s3-boston
+    inputs:
+      parameters:
+        - name: split_path
+        - name: output_path
+      artifacts:
+      - name: data-split
+        path: /S3data/split_set.pickle
+    container:
+      image: train-model:latest
+      imagePullPolicy: Never
+      command: [python3]
+      args: ['train_model.py',
+            '--split_path', '{{inputs.parameters.split_path}}',
+            '--output_path', '{{inputs.parameters.output_path}}']
+    outputs:
+      artifacts:
+      - name: data-trained-model
+        path: '{{inputs.parameters.output_path}}'
+        s3:
+          endpoint: argo-artifacts:9000
+          insecure: true
+          bucket: my-bucket
+          key: boston/data/trained_model.pickle
+          accessKeySecret:
+            name: argo-artifacts
+            key: accesskey
+          secretKeySecret:
+            name: argo-artifacts
+            key: secretkey
+  - name: split-set-s3-boston
+    inputs:
+      parameters:
+        - name: df_path
+        - name: list_feat1
+        - name: list_feat2
+        - name: output_path
+        - name: target
+      artifacts:
+      - name: data-df
+        path: /S3data/df.pickle
+    container:
+      image: split-train-test:latest
+      imagePullPolicy: Never
+      command: [python3]
+      args: ['split_train_test.py',
+            '--df_path', '{{inputs.parameters.df_path}}',
+            '--target', '{{inputs.parameters.target}}', 
+            '--output_path', '{{inputs.parameters.output_path}}',
+            '--list_features', '{{inputs.parameters.list_feat1}}', 
+            '{{inputs.parameters.list_feat2}}']
+      #command: [echo]
+      #args: ['{{inputs.parameters.list_features}}']
+    outputs:
+      artifacts:
+      - name: data-split
+        path: '{{inputs.parameters.output_path}}'
+        s3:
+          endpoint: argo-artifacts:9000
+          insecure: true
+          bucket: my-bucket
+          key: boston/data/split_set.pickle
+          accessKeySecret:
+            name: argo-artifacts
+            key: accesskey
+          secretKeySecret:
+            name: argo-artifacts
+            key: secretkey
+  - name: csv-df-s3-boston
+    inputs:
+      parameters:
+        - name: csv_path
+        - name: output_path
+      artifacts:
+      - name: data-CSV
+        path: /S3data
+        s3:
+          endpoint: argo-artifacts:9000
+          insecure: true
+          bucket: my-bucket
+          key: boston/data
+          accessKeySecret:
+            name: argo-artifacts
+            key: accesskey
+          secretKeySecret:
+            name: argo-artifacts
+            key: secretkey
+    container:
+      image: csv-df:latest
+      imagePullPolicy: Never
+      command: [python3]
+      args: ["CSV_to_df.py", "--csv_path", "{{inputs.parameters.csv_path}}",
+       "--output_path", "{{inputs.parameters.output_path}}"]
+    outputs:
+      artifacts:
+      - name: data-df
+        path: "{{inputs.parameters.output_path}}"
+        s3:
+          endpoint: argo-artifacts:9000
+          insecure: true
+          bucket: my-bucket
+          key: boston/data/df.pickle
+          accessKeySecret:
+            name: argo-artifacts
+            key: accesskey
+          secretKeySecret:
+            name: argo-artifacts
+            key: secretkey
