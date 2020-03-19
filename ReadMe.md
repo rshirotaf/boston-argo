@@ -7,7 +7,7 @@ This project is to recreate Argo version from this [code](https://towardsdatasci
 - Minikube [site](https://kubernetes.io/docs/tasks/tools/install-minikube/)
 	- Virtualbox [site](https://www.virtualbox.org/wiki/Linux_Downloads)
 - Kubernetes [site](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
-- Argo CLI [site](https://github.com/argoproj/argo/releases)1`
+- Argo CLI [site](https://github.com/argoproj/argo/releases)
 - Docker [site](https://docs.docker.com/install/linux/docker-ce/ubuntu/)
 
 # Step by step
@@ -169,3 +169,5 @@ Add the boston dataset to your minikube via the UI
 Run the Argo yaml file
 	
 	boston$ argo submit yaml/csv-df-train-eval-draw-artifactpassing.yaml
+
+[!image](https://github.com/william-yl-gu/boston-argo/blob/master/tmp/argo.png)
