@@ -46,7 +46,7 @@ spec:
           endpoint: argo-artifacts:9000
           insecure: true
           bucket: my-bucket
-          key: boston/data/df.pickle.tgz
+          key: boston/data/df.pickle
           accessKeySecret:
             name: argo-artifacts
             key: accesskey

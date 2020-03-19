@@ -12,7 +12,7 @@ This project is to recreate Argo version from this [code](https://towardsdatasci
 
 # Step by step
 ## 1. Start minikube
-	$minikube start --driver=virtualbox
+	$ minikube start --driver=virtualbox
 
 ## 2. Install other services
 - Argo controller, [Step 2 and 3](https://github.com/argoproj/argo/blob/master/docs/getting-started.md)
@@ -169,5 +169,3 @@ Add the boston dataset to your minikube via the UI
 Run the Argo yaml file
 	
 	boston$ argo submit yaml/csv-df-train-eval-draw-artifactpassing.yaml
-
-[!image](https://github.com/william-yl-gu/boston-argo/blob/master/tmp/argo.png)
