@@ -1,6 +1,9 @@
-FROM ubuntu:18.04
+FROM python:3.6
+#RUN apt-get update
+#RUN apt-get install -y python3 python3-pip
 RUN apt-get update
-RUN apt-get install -y python3 python3-pip
+RUN apt-get upgrade
+
 
 RUN mkdir /app
 RUN mkdir /data

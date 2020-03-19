@@ -7,4 +7,5 @@ docker build -f 3-train-model/docker/Dockerfile -t train-model .
 echo "*******Building Eval********"
 docker build -f 4-eval-model/docker/Dockerfile -t eval-model .
 echo "*******Building Draw Func********"
-docker build -f 2-draw-function/ -t draw-function .
+docker build -f 2-draw-function/docker/Dockerfile -t draw-function .
+echo "******* Good Day********"

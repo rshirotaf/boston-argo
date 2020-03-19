@@ -1,11 +1,11 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: csv-df-s3-
+  generateName: boston-s3-
 spec:
-  entrypoint: csv-df-s3-DAG
+  entrypoint: boston-s3-DAG
   templates:
-  - name: csv-df-s3-DAG
+  - name: boston-s3-DAG
     dag:
       tasks:
       - name: csv-df
@@ -21,8 +21,8 @@ spec:
           - name: data-df
             from: "{{tasks.csv-df.outputs.artifacts.data-df}}"
           parameters: [{name: df_path, value: /S3data/df.pickle},
-                      {name: list_feat1, value: lstat},
-                      {name: list_feat2, value: rm},
+                      {name: feat1, value: lstat},
+                      {name: feat2, value: rm},
                       {name: target, value: medv},
                       {name: output_path, value: /S3data/split_set.pickle}]
       - name: train-model
@@ -34,7 +34,6 @@ spec:
             from: "{{tasks.split-set.outputs.artifacts.data-split}}"
           parameters: [{name: split_path, value: /S3data/split_set.pickle},
                       {name: output_path, value: /S3data/trained_model.pickle}]
-
       - name: eval-model
         dependencies: [split-set, train-model]
         template: eval-model-s3-boston
@@ -46,6 +45,41 @@ spec:
             from: "{{tasks.train-model.outputs.artifacts.data-trained-model}}"
           parameters: [{name: split_path, value: /S3data/split_set.pickle},
                       {name: trained_model_path, value: /S3data/trained_model.pickle}]
+      - name: draw-hist
+        dependencies: [csv-df]
+        template: draw-s3-boston
+        arguments:
+          artifacts:
+          - name: data-df
+            from: "{{tasks.csv-df.outputs.artifacts.data-df}}"
+          parameters: [{name: df_path, value: /S3data/df.pickle},
+                      {name: target, value: medv},
+                      {name: bins, value: 30},
+                      {name: draw_type, value: hist},
+                      {name: image_path, value: /tmp/hist.png}]
+      - name: draw-heat
+        dependencies: [csv-df]
+        template: draw-s3-boston
+        arguments:
+          artifacts:
+          - name: data-df
+            from: "{{tasks.csv-df.outputs.artifacts.data-df}}"
+          parameters: [{name: df_path, value: /S3data/df.pickle},
+                      {name: draw_type, value: heatmap},
+                      {name: image_path, value: /tmp/heatmap.png}]
+      - name: draw-plot
+        dependencies: [csv-df]
+        template: draw-s3-boston
+        arguments:
+          artifacts:
+          - name: data-df
+            from: "{{tasks.csv-df.outputs.artifacts.data-df}}"
+          parameters: [{name: df_path, value: /S3data/df.pickle},
+                      {name: draw_type, value: plot},
+                      {name: feat1, value: lstat},
+                      {name: feat2, value: rm},
+                      {name: target, value: medv},
+                      {name: image_path, value: /tmp/plot.png}]
   - name: eval-model-s3-boston
     inputs:
       parameters:
@@ -97,8 +131,8 @@ spec:
     inputs:
       parameters:
         - name: df_path
-        - name: list_feat1
-        - name: list_feat2
+        - name: feat1
+        - name: feat2
         - name: output_path
         - name: target
       artifacts:
@@ -112,8 +146,8 @@ spec:
             '--df_path', '{{inputs.parameters.df_path}}',
             '--target', '{{inputs.parameters.target}}', 
             '--output_path', '{{inputs.parameters.output_path}}',
-            '--list_features', '{{inputs.parameters.list_feat1}}', 
-            '{{inputs.parameters.list_feat2}}']
+            '--list_features', '{{inputs.parameters.feat1}}', 
+            '{{inputs.parameters.feat2}}']
       #command: [echo]
       #args: ['{{inputs.parameters.list_features}}']
     outputs:
@@ -165,6 +199,54 @@ spec:
           insecure: true
           bucket: my-bucket
           key: boston/data/df.pickle
+          accessKeySecret:
+            name: argo-artifacts
+            key: accesskey
+          secretKeySecret:
+            name: argo-artifacts
+            key: secretkey
+  - name: draw-s3-boston
+    inputs:
+      parameters:
+        #Set the default value
+        - name: df_path
+          value: None
+        - name: bins
+          value: 5
+        - name: image_path
+          value: /tmp/output.png
+        - name: target
+          value: None
+        - name: draw_type
+          value: hist
+        - name: feat1
+          value: None
+        - name: feat2
+          value: None
+      artifacts:
+      - name: data-df
+        path: /S3data/df.pickle
+    container:
+      image: draw-function:latest
+      imagePullPolicy: Never
+      command: [python3]
+      args: ['draw_function.py',
+            '--df_path', '{{inputs.parameters.df_path}}',
+            '--target', '{{inputs.parameters.target}}', 
+            '--bins', '{{inputs.parameters.bins}}',
+            '--draw_type', '{{inputs.parameters.draw_type}}',
+            '--list_features', '{{inputs.parameters.feat1}}', 
+            '{{inputs.parameters.feat2}}',
+            '--save_img_path', '{{inputs.parameters.image_path}}']
+    outputs:
+      artifacts:
+      - name: data-hist
+        path: '{{inputs.parameters.image_path}}'
+        s3:
+          endpoint: argo-artifacts:9000
+          insecure: true
+          bucket: my-bucket
+          key: boston/data/{{inputs.parameters.draw_type}}.tgz
           accessKeySecret:
             name: argo-artifacts
             key: accesskey
